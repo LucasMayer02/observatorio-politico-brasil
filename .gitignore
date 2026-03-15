@@ -16,6 +16,11 @@ data/raw/*
 data/processed/*
 data/chroma/*
 
+# Keep directory structure
+!data/raw/.gitkeep
+!data/processed/.gitkeep
+!data/chroma/.gitkeep
+
 # Logs
 *.log
 
