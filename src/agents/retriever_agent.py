@@ -4,6 +4,7 @@ import unicodedata
 from spacy.lang.pt.stop_words import STOP_WORDS
 
 from src.rag.retriever import get_retriever
+from src.graph.state import GraphState
 
 
 # Stopwords em set para busca O(1)
@@ -35,7 +36,7 @@ def score_doc(question_terms, content: str, title: str):
     return sum(1 for term in question_terms if term in text)
 
 
-def retriever_node(state):
+def retriever_node(state: GraphState):
     question = state.get("question", "").strip()
 
     if not question:
@@ -68,3 +69,7 @@ def retriever_node(state):
         )
 
     return {"retrieved_docs": retrieved_docs}
+
+if __name__ == '__main__':
+    state = GraphState(question= "O que está acontecendo no Irã?")
+    print(retriever_node(state))

@@ -1,19 +1,30 @@
 import re
+import unicodedata
+
+from spacy.lang.pt.stop_words import STOP_WORDS
 
 
-STOPWORDS = {
-    "a", "o", "os", "as", "de", "da", "do", "das", "dos",
-    "e", "é", "em", "no", "na", "nos", "nas", "um", "uma",
-    "que", "quem", "qual", "quais", "foi", "são", "ser",
-    "por", "para", "com", "sem", "ao", "aos", "à", "às",
-    "como", "sobre"
-}
+# Stopwords em set para busca O(1)
+STOPWORDS = set(STOP_WORDS)
+
+
+def normalize(text: str):
+    """Remove acentos e normaliza texto"""
+    text = text.lower()
+    text = unicodedata.normalize("NFD", text)
+    text = "".join(c for c in text if unicodedata.category(c) != "Mn")
+    return text
 
 
 def tokenize(text: str):
-    terms = re.findall(r"\b[a-zA-ZÀ-ÿ0-9-]+\b", text.lower())
-    return [term for term in terms if term not in STOPWORDS and len(term) > 2]
+    text = normalize(text)
 
+    terms = re.findall(r"\b[a-z0-9-]+\b", text)
+
+    return [
+        term for term in terms
+        if term not in STOPWORDS and len(term) > 2
+    ]
 
 def self_check_node(state):
     retrieved_docs = state.get("retrieved_docs", [])

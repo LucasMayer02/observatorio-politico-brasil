@@ -2,6 +2,8 @@ from langchain_ollama import ChatOllama
 
 from src.config import OLLAMA_BASE_URL, OLLAMA_MODEL
 
+K = 3
+PADDING_SIZE = 500
 
 def writer_node(state):
     retrieved_docs = state.get("retrieved_docs", [])
@@ -12,7 +14,7 @@ def writer_node(state):
             "citations": [],
         }
 
-    top_docs = retrieved_docs[:3]
+    top_docs = retrieved_docs[:K]
     citations = []
 
     evidence_blocks = []
@@ -21,7 +23,7 @@ def writer_node(state):
         metadata = doc.get("metadata", {})
         content = doc.get("content", "").strip()
 
-        snippet = content[:500].strip()
+        snippet = content[:PADDING_SIZE].strip()
 
         evidence_blocks.append(
             f"[{idx}] Título: {metadata.get('title', '')}\n"
