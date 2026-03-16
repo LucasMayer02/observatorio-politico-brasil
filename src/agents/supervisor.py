@@ -1,21 +1,32 @@
-def supervisor_node(state):
-    question = state.get("question", "").strip().lower()
+from src.agents.router_rules import rule_router
+from src.agents.light_classifier import classify_question
 
-    if not question:
-        return {
-            "route": "refuse",
-            "refusal_reason": "Pergunta vazia ou inválida."
-        }
+from ..graph.state import GraphState
 
-    automation_keywords = [
-        "briefing",
-        "resumo",
-        "relatório",
-        "timeline",
-        "linha do tempo"
-    ]
 
-    if any(keyword in question for keyword in automation_keywords):
-        return {"route": "automation"}
+def supervisor_node(state: GraphState) -> GraphState:
 
-    return {"route": "qna"}
+    question = state["question"]
+
+    # 1️⃣ regras rápidas
+    route = rule_router(question)
+
+    if route:
+        return {"route": route}
+
+    # 2️⃣ fallback para classificador
+    route = classify_question(question)
+
+    return {"route": route}
+
+if __name__ == "__main__":
+
+    query = input("Pergunta: ")
+
+    state: GraphState = {
+        "question": query
+    }
+
+    result = supervisor_node(state)
+
+    print("Route:", result["route"])

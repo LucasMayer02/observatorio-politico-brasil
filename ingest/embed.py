@@ -8,6 +8,7 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 from langchain_community.vectorstores import Chroma
 from langchain_community.embeddings import HuggingFaceEmbeddings
 from langchain_core.documents import Document
+
 from src.config import PROCESSED_DATA_DIR
 
 
@@ -44,10 +45,24 @@ def load_chunks(chunk_dir: Path):
                 "source": chunk.get("source"),
                 "url": chunk.get("url"),
                 "published_at": chunk.get("published_at"),
-                "topic": chunk.get("topic"),
+                "topic": chunk.get("topic")
             }
 
-            docs.append(Document(page_content=text, metadata=metadata))
+            countries = chunk.get("countries")
+            regions = chunk.get("regions")
+
+            if countries:
+                metadata["countries"] = countries
+
+            if regions:
+                metadata["regions"] = regions
+
+            docs.append(
+                Document(
+                    page_content=text,
+                    metadata=metadata
+                )
+            )
 
         except Exception as e:
 
@@ -63,25 +78,42 @@ def load_chunks(chunk_dir: Path):
 def build_embeddings():
 
     embeddings = HuggingFaceEmbeddings(
-        model_name=EMBEDDING_MODEL
+        model_name=EMBEDDING_MODEL,
+        model_kwargs={"device": "cpu"},
+        encode_kwargs={"normalize_embeddings": True}
     )
 
     return embeddings
 
 
 # =========================================================
-# CRIAR VECTOR STORE
+# CRIAR OU ATUALIZAR VECTOR STORE
 # =========================================================
 
 def build_vectorstore(documents, vectorstore_dir: Path):
 
     embeddings = build_embeddings()
 
-    vectorstore = Chroma.from_documents(
-        documents,
-        embeddings,
-        persist_directory=str(vectorstore_dir)
-    )
+    if vectorstore_dir.exists():
+
+        print("Vectorstore existente encontrado. Atualizando índice...")
+
+        vectorstore = Chroma(
+            persist_directory=str(vectorstore_dir),
+            embedding_function=embeddings
+        )
+
+        vectorstore.add_documents(documents)
+
+    else:
+
+        print("Criando novo vectorstore...")
+
+        vectorstore = Chroma.from_documents(
+            documents,
+            embeddings,
+            persist_directory=str(vectorstore_dir)
+        )
 
     vectorstore.persist()
 

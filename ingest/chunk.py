@@ -62,18 +62,16 @@ def build_chunk_records(doc: dict, splitter):
                 "chunk_id": f"{doc['doc_id']}_chunk_{idx}",
                 "doc_id": doc["doc_id"],
                 "chunk_index": idx,
-
                 "text": chunk_text,
 
-                "title": doc.get("title", ""),
-                "source": doc.get("source", ""),
-                "url": doc.get("url", ""),
+                "title": doc.get("title"),
+                "url": doc.get("url"),
+                "source": doc.get("source"),
+                "published_at": doc.get("published_at"),
 
-                "published_at": doc.get("published_at", ""),
-                "topic": doc.get("topic", ""),
-
-                # metadados úteis para RAG
-                "citability": doc.get("citability", {}),
+                "category": doc.get("category"),
+                "countries": doc.get("countries", []),
+                "regions": doc.get("regions", [])
             }
         )
 
@@ -146,11 +144,13 @@ def chunk_all_documents():
 
         chunk_records = build_chunk_records(doc, splitter)
 
+        generated = len(chunk_records)
+
         saved = save_chunks(chunk_records, chunk_dir)
 
         total_chunks += saved
 
-        print(f"[OK] {doc['doc_id']} → {saved} chunks")
+        print(f"[OK] {doc['doc_id']} → {generated} generated | {saved} saved")
 
     print(f"\nTotal de chunks criados: {total_chunks}")
     print(f"Diretório de saída: {chunk_dir}")
