@@ -1,10 +1,9 @@
 import os
 import sys
-
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
-
 import json
 from pathlib import Path
+
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 
@@ -14,60 +13,110 @@ from src.config import PROCESSED_DATA_DIR
 CHUNK_SIZE = 1000
 CHUNK_OVERLAP = 150
 
+CHUNK_DIR_NAME = "chunks"
+
+
+# =========================================================
+# CARREGAR DOCUMENTOS PROCESSADOS
+# =========================================================
 
 def load_processed_documents(processed_dir: Path):
+
     docs = []
 
     for file_path in processed_dir.glob("*.json"):
-        # ignorar o arquivo agregado de chunks
-        if file_path.name == "chunks.json":
-            continue
 
         with open(file_path, "r", encoding="utf-8") as f:
-            data = json.load(f)
 
-            # garantir que só documentos individuais entrem
-            if isinstance(data, dict):
-                docs.append(data)
-            else:
-                print(f"[AVISO] Ignorando arquivo não compatível: {file_path.name}")
+            try:
+                data = json.load(f)
+
+                if isinstance(data, dict):
+                    docs.append(data)
+
+            except Exception as e:
+                print(f"[ERRO] Falha ao ler {file_path.name}: {e}")
 
     return docs
 
 
-def build_chunk_records(doc: dict, splitter: RecursiveCharacterTextSplitter):
+# =========================================================
+# GERAR CHUNKS
+# =========================================================
+
+def build_chunk_records(doc: dict, splitter):
+
     content = doc.get("content_clean", "").strip()
 
     if not content:
         return []
 
     chunks = splitter.split_text(content)
+
     records = []
 
     for idx, chunk_text in enumerate(chunks):
+
         records.append(
             {
                 "chunk_id": f"{doc['doc_id']}_chunk_{idx}",
                 "doc_id": doc["doc_id"],
                 "chunk_index": idx,
                 "text": chunk_text,
-                "source": doc.get("source", ""),
-                "title": doc.get("title", ""),
-                "url": doc.get("url", ""),
-                "published_at": doc.get("published_at", ""),
-                "topic": doc.get("topic", "politica"),
+
+                "title": doc.get("title"),
+                "url": doc.get("url"),
+                "source": doc.get("source"),
+                "published_at": doc.get("published_at"),
+
+                "category": doc.get("category"),
+                "countries": doc.get("countries", []),
+                "regions": doc.get("regions", [])
             }
         )
 
     return records
 
 
+# =========================================================
+# SALVAR CHUNKS
+# =========================================================
+
+def save_chunks(chunk_records, chunk_dir: Path):
+
+    saved = 0
+
+    for chunk in chunk_records:
+
+        file_path = chunk_dir / f"{chunk['chunk_id']}.json"
+
+        # evita reprocessar
+        if file_path.exists():
+            continue
+
+        with open(file_path, "w", encoding="utf-8") as f:
+
+            json.dump(chunk, f, ensure_ascii=False, indent=2)
+
+        saved += 1
+
+    return saved
+
+
+# =========================================================
+# PIPELINE PRINCIPAL
+# =========================================================
+
 def chunk_all_documents():
+
     processed_dir = Path(PROCESSED_DATA_DIR)
 
     if not processed_dir.exists():
-        print("Diretório de processados não encontrado.")
+        print("Diretório de documentos processados não encontrado.")
         return
+
+    chunk_dir = processed_dir.parent / CHUNK_DIR_NAME
+    chunk_dir.mkdir(parents=True, exist_ok=True)
 
     docs = load_processed_documents(processed_dir)
 
@@ -76,27 +125,41 @@ def chunk_all_documents():
         return
 
     splitter = RecursiveCharacterTextSplitter(
+
         chunk_size=CHUNK_SIZE,
         chunk_overlap=CHUNK_OVERLAP,
-        separators=["\n\n", "\n", ". ", " ", ""],
+
+        separators=[
+            "\n\n",
+            "\n",
+            ". ",
+            " ",
+            ""
+        ],
     )
 
-    all_chunks = []
+    total_chunks = 0
 
     for doc in docs:
+
         chunk_records = build_chunk_records(doc, splitter)
-        all_chunks.extend(chunk_records)
 
-        print(f"[OK] {doc['doc_id']} -> {len(chunk_records)} chunks")
+        generated = len(chunk_records)
 
-    output_path = processed_dir / "chunks.json"
+        saved = save_chunks(chunk_records, chunk_dir)
 
-    with open(output_path, "w", encoding="utf-8") as f:
-        json.dump(all_chunks, f, ensure_ascii=False, indent=2)
+        total_chunks += saved
 
-    print(f"\nTotal de chunks: {len(all_chunks)}")
-    print(f"Arquivo salvo em: {output_path}")
+        print(f"[OK] {doc['doc_id']} → {generated} generated | {saved} saved")
 
+    print(f"\nTotal de chunks criados: {total_chunks}")
+    print(f"Diretório de saída: {chunk_dir}")
+
+
+# =========================================================
+# EXECUÇÃO
+# =========================================================
 
 if __name__ == "__main__":
+
     chunk_all_documents()
