@@ -23,3 +23,6 @@ numpy
 tqdm
 
 pytest
+
+mcp
+langchain-mcp-adapters
