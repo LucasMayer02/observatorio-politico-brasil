@@ -1,86 +1,123 @@
 import os
-import sys
-
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
-
 import json
-import re
-import unicodedata
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
+from typing import List, Dict, Optional
 
 import feedparser
 import httpx
+import pandas as pd
 import trafilatura
-
-from src.config import RAW_DATA_DIR
-
-
-AGENCIA_BRASIL_RSS = "https://agenciabrasil.ebc.com.br/rss/politica/feed.xml"
+from tqdm import tqdm
+from dateutil import parser as dateparser
 
 
-def slugify(text: str) -> str:
-    text = unicodedata.normalize("NFKD", text).encode("ascii", "ignore").decode("ascii")
-    text = text.lower().strip()
-    text = re.sub(r"[^a-z0-9\s-]", "", text)
-    text = re.sub(r"[\s-]+", "-", text)
-    return text
+# =========================================================
+# CONFIGURAÇÃO
+# =========================================================
+
+RAW_DATA_DIR = "data/raw"
+
+SITE_SOURCE = {
+    "https://www.bbc.com/": "BBC",
+    "https://www.nytimes.com/": "The New York Times",
+}
+
+RSS_FEEDS = {
+    "https://www.bbc.com/": "https://feeds.bbci.co.uk/news/world/rss.xml",
+    "https://www.nytimes.com/": "https://rss.nytimes.com/services/xml/rss/nyt/World.xml",
+}
 
 
-def build_doc_id(source: str, published_at: str, title: str) -> str:
-    date_part = published_at[:10] if published_at else "sem-data"
-    source_slug = slugify(source)
-    title_slug = slugify(title)[:80]
-    return f"{source_slug}_{date_part}_{title_slug}"
+# =========================================================
+# UTILITÁRIOS
+# =========================================================
+
+def build_doc_id(source: str, published_at: str, title: str):
+
+    title_slug = (
+        title.lower()
+        .replace(" ", "-")
+        .replace("/", "")
+        .replace(":", "")
+    )
+
+    date_part = published_at[:10] if published_at else "no-date"
+
+    return f"{source.lower().replace(' ', '-')}_{date_part}_{title_slug[:80]}"
 
 
-def fetch_rss_entries(feed_url: str):
-    feed = feedparser.parse(feed_url)
-    return feed.entries
+def fetch_html(url: str):
 
-
-def extract_published_at(entry) -> str:
-    if hasattr(entry, "published_parsed") and entry.published_parsed:
-        return datetime(*entry.published_parsed[:6]).isoformat()
-    if hasattr(entry, "published"):
-        return entry.published
-    return ""
-
-
-def fetch_html(url: str) -> str:
     with httpx.Client(timeout=30.0, follow_redirects=True) as client:
+
         response = client.get(url)
         response.raise_for_status()
+
         return response.text
 
 
-def extract_main_text(html: str, url: str = "") -> str:
-    downloaded = trafilatura.extract(
+def extract_main_text(html: str, url: str):
+
+    content = trafilatura.extract(
         html,
         include_links=False,
         include_images=False,
         url=url,
     )
-    return downloaded or ""
+
+    return content or ""
 
 
-def build_raw_document(entry, html: str, content_raw: str) -> dict:
+# =========================================================
+# EXTRAÇÃO RSS
+# =========================================================
+
+def fetch_rss_entries(feed_url: str):
+
+    feed = feedparser.parse(feed_url)
+
+    return feed.entries
+
+
+def extract_published(entry):
+
+    if hasattr(entry, "published_parsed") and entry.published_parsed:
+
+        return datetime(*entry.published_parsed[:6]).isoformat()
+
+    if hasattr(entry, "published"):
+
+        try:
+            return dateparser.parse(entry.published).isoformat()
+        except:
+            return ""
+
+    return ""
+
+
+# =========================================================
+# CONSTRUÇÃO DO DOCUMENTO
+# =========================================================
+
+def build_document(entry, source_name, content_raw):
+
     title = getattr(entry, "title", "").strip()
     url = getattr(entry, "link", "").strip()
-    published_at = extract_published_at(entry)
-    collected_at = datetime.now().isoformat()
 
-    doc_id = build_doc_id("Agencia Brasil", published_at, title)
+    published_at = extract_published(entry)
 
-    summary = ""
-    if hasattr(entry, "summary"):
-        summary = entry.summary
+    collected_at = datetime.now(timezone.utc).isoformat()
+
+    doc_id = build_doc_id(source_name, published_at, title)
+
+    summary = getattr(entry, "summary", "")
 
     return {
         "doc_id": doc_id,
-        "source": "Agencia Brasil",
+        "source": source_name,
         "source_type": "news_site",
-        "topic": "politica",
+        "topic": "politics",
         "title": title,
         "url": url,
         "published_at": published_at,
@@ -88,51 +125,99 @@ def build_raw_document(entry, html: str, content_raw: str) -> dict:
         "author": "",
         "summary": summary,
         "content_raw": content_raw,
-        "language": "pt-BR",
+        "language": "en",
         "tags": [],
         "metadata": {
             "collector": "rss+html",
-            "base_url": "https://agenciabrasil.ebc.com.br",
             "status": "success" if content_raw else "empty_content",
         },
     }
 
 
-def save_raw_document(doc: dict):
+# =========================================================
+# SALVAR DOCUMENTO
+# =========================================================
+
+def save_document(doc: dict):
+
     output_dir = Path(RAW_DATA_DIR)
     output_dir.mkdir(parents=True, exist_ok=True)
 
-    output_path = output_dir / f"{doc['doc_id']}.json"
+    path = output_dir / f"{doc['doc_id']}.json"
 
-    with open(output_path, "w", encoding="utf-8") as f:
+    with open(path, "w", encoding="utf-8") as f:
+
         json.dump(doc, f, ensure_ascii=False, indent=2)
 
 
-def collect_agencia_brasil(limit: int = 5):
-    entries = fetch_rss_entries(AGENCIA_BRASIL_RSS)
+# =========================================================
+# COLETA PRINCIPAL
+# =========================================================
+
+def collect_from_feed(site: str, limit: Optional[int] = None):
+
+    rss_url = RSS_FEEDS[site]
+
+    source_name = SITE_SOURCE[site]
+
+    entries = fetch_rss_entries(rss_url)
+
+    if limit:
+        entries = entries[:limit]
 
     collected = 0
 
-    for entry in entries[:limit]:
+    for entry in tqdm(entries):
+
         try:
+
             url = getattr(entry, "link", "").strip()
+
             if not url:
                 continue
 
             html = fetch_html(url)
-            content_raw = extract_main_text(html, url=url)
 
-            doc = build_raw_document(entry, html, content_raw)
-            save_raw_document(doc)
+            content_raw = extract_main_text(html, url)
+
+            doc = build_document(entry, source_name, content_raw)
+
+            save_document(doc)
 
             collected += 1
-            print(f"[OK] Coletado: {doc['title']}")
 
         except Exception as e:
-            print(f"[ERRO] Falha ao coletar entrada: {e}")
 
-    print(f"\nTotal coletado: {collected}")
+            print(f"[ERRO] {e}")
 
+    return collected
+
+
+# =========================================================
+# PIPELINE DE COLETA
+# =========================================================
+
+def collect():
+
+    total = 0
+
+    for site in RSS_FEEDS:
+
+        print(f"\nColetando {SITE_SOURCE[site]}...")
+
+        n = collect_from_feed(site)
+
+        total += n
+
+    print(f"\nTotal coletado: {total}")
+
+    return total
+
+
+# =========================================================
+# EXECUÇÃO
+# =========================================================
 
 if __name__ == "__main__":
-    collect_agencia_brasil(limit=5)
+
+    collect()
