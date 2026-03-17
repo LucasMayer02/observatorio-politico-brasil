@@ -3,7 +3,7 @@ import asyncio
 from langchain_mcp_adapters.client import MultiServerMCPClient
 
 
-async def main():
+async def load_mcp_tools():
     client = MultiServerMCPClient(
         {
             "news": {
@@ -15,11 +15,8 @@ async def main():
     )
 
     tools = await client.get_tools()
-
-    print("TOOLS DISPONÍVEIS:")
-    for tool in tools:
-        print("-", tool.name)
+    return tools
 
 
-if __name__ == "__main__":
-    asyncio.run(main())
+def get_mcp_tools():
+    return asyncio.run(load_mcp_tools())
