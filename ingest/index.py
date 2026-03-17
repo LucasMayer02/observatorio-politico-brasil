@@ -1,61 +1,109 @@
 import os
 import sys
-
-# permitir importar src/
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
-
-import json
 from pathlib import Path
 
-from langchain_core.documents import Document
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
+
+from langchain_community.vectorstores import Chroma
+from langchain_community.embeddings import HuggingFaceEmbeddings
 
 from src.config import PROCESSED_DATA_DIR
-from src.rag.vectorstore import get_vectorstore
 
 
-def load_chunks():
-    chunks_path = Path(PROCESSED_DATA_DIR) / "chunks.json"
-
-    if not chunks_path.exists():
-        raise FileNotFoundError(f"Arquivo não encontrado: {chunks_path}")
-
-    with open(chunks_path, "r", encoding="utf-8") as f:
-        return json.load(f)
+VECTORSTORE_DIR_NAME = "vectorstore"
+EMBEDDING_MODEL = "BAAI/bge-small-en"
 
 
-def build_documents(chunk_records):
-    documents = []
+# =========================================================
+# CARREGAR EMBEDDINGS
+# =========================================================
 
-    for chunk in chunk_records:
-        doc = Document(
-            page_content=chunk["text"],
-            metadata={
-                "chunk_id": chunk["chunk_id"],
-                "doc_id": chunk["doc_id"],
-                "chunk_index": chunk["chunk_index"],
-                "source": chunk["source"],
-                "title": chunk["title"],
-                "url": chunk["url"],
-                "published_at": chunk["published_at"],
-                "topic": chunk["topic"],
-            },
+def load_embeddings():
+
+    return HuggingFaceEmbeddings(
+        model_name=EMBEDDING_MODEL
+    )
+
+
+# =========================================================
+# CARREGAR VECTOR STORE
+# =========================================================
+
+def load_vectorstore():
+
+    base_dir = Path(PROCESSED_DATA_DIR).parent
+    vectorstore_dir = base_dir / VECTORSTORE_DIR_NAME
+
+    if not vectorstore_dir.exists():
+
+        raise FileNotFoundError(
+            f"Vector store não encontrado em {vectorstore_dir}"
         )
 
-        documents.append(doc)
+    embeddings = load_embeddings()
 
-    return documents
+    vectorstore = Chroma(
+        persist_directory=str(vectorstore_dir),
+        embedding_function=embeddings
+    )
+
+    return vectorstore
 
 
-def index_chunks():
-    chunk_records = load_chunks()
-    documents = build_documents(chunk_records)
+# =========================================================
+# CRIAR RETRIEVER
+# =========================================================
 
-    vectorstore = get_vectorstore()
+def get_retriever(k: int = 5):
 
-    vectorstore.add_documents(documents)
+    vectorstore = load_vectorstore()
 
-    print(f"Total indexado: {len(documents)}")
+    retriever = vectorstore.as_retriever(
+        search_type="similarity",
+        search_kwargs={"k": k}
+    )
 
+    return retriever
+
+
+# =========================================================
+# BUSCA SIMPLES (DEBUG)
+# =========================================================
+
+def search(query: str, k: int = 5):
+
+    retriever = get_retriever(k)
+
+    docs = retriever.invoke(query)
+
+    results = []
+
+    for doc in docs:
+
+        results.append({
+            "text": doc.page_content,
+            "metadata": doc.metadata
+        })
+
+    return results
+
+
+# =========================================================
+# TESTE DO ÍNDICE
+# =========================================================
 
 if __name__ == "__main__":
-    index_chunks()
+
+    query = "Ukraine Russia war"
+
+    print(f"\nBuscando: {query}\n")
+
+    results = search(query)
+
+    for i, r in enumerate(results):
+
+        print("=" * 60)
+        print(f"Resultado {i+1}")
+        print(r["metadata"])
+        print()
+        print(r["text"][:400])
