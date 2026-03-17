@@ -52,7 +52,7 @@ LangGraph Agent
 ### LLM
 
 * Ollama
-* Modelo: **qwen2.5:7b**
+* Modelo: **qwen2.5:7b** (SE MUITO PESADO USAR qwen2.5:3b)
 
 ### Frameworks
 
@@ -74,7 +74,6 @@ LangGraph Agent
 ### Coleta de notícias
 
 * RSS feeds
-* BeautifulSoup
 * Trafilatura
 
 ### Outras bibliotecas
@@ -120,6 +119,14 @@ config.py
 O corpus é composto por notícias políticas coletadas de fontes públicas, incluindo:
 
 * Agência Brasil
+* G1
+* Terra
+* r7
+* Folha
+* Estadão
+* Correios Brasiliense
+* O globo
+* ...
 
 Os dados passam por:
 
