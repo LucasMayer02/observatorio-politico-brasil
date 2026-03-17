@@ -232,7 +232,7 @@ Fontes utilizadas
 
 ---
 
-# Integração com MCP
+# Integração com MCP (NÃO FOI COMPLETADO)
 
 O projeto implementa um **servidor MCP próprio** para expor ferramentas estruturadas de acesso ao corpus.
 
@@ -250,7 +250,7 @@ src/mcp/client.py
 
 ---
 
-# Tools MCP Disponíveis
+# Tools MCP Disponíveis (INCOMPLETO)
 
 ## list_articles
 
