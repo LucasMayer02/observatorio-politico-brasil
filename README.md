@@ -2,7 +2,7 @@
 
 Sistema baseado em **RAG (Retrieval-Augmented Generation)** para consulta e geração automática de briefings políticos a partir de notícias recentes.
 
-O projeto utiliza **LLMs locais via Ollama**, **LangGraph para orquestração**, **vector database (Chroma)** para recuperação de documentos e **Model Context Protocol (MCP)** para expor ferramentas estruturadas de acesso ao corpus.
+O projeto utiliza **LLMs locais via Ollama**, **LangGraph para orquestração**, **vector database (Chroma)** para recuperação de documentos.
 
 ---
 
@@ -14,7 +14,7 @@ O objetivo do sistema é permitir:
 2. **Gerar briefings automáticos** sobre temas políticos recentes.
 3. Garantir que as respostas sejam **baseadas em evidências do corpus**.
 4. Demonstrar o uso de **LLMs integrados a sistemas de recuperação e automação**.
-5. Integrar ferramentas externas através do **Model Context Protocol (MCP)**.
+5. Integrar ferramentas externas através do **Model Context Protocol (MCP)**. (NÃO FOI POSSÍVEL REALIZAR)
 
 ---
 
