@@ -310,7 +310,7 @@ lista cronológica de artigos
 
 ---
 
-# Segurança do MCP
+# Segurança do MCP (INCOMPLETO)
 
 Para evitar uso indevido do sistema, foram implementadas medidas de segurança.
 
