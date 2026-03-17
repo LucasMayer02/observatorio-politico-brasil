@@ -1,3 +1,6 @@
+# LINK Apresentação : https://app.slidespeak.co/presentation/cmmtw7a3u012ep408eq0ckd4f/share?openPanel=ASSISTANT
+
+
 # Observatório Político do Brasil
 
 Sistema baseado em **RAG (Retrieval-Augmented Generation)** para consulta e geração automática de briefings políticos a partir de notícias recentes.
