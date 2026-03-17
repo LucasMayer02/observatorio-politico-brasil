@@ -501,7 +501,6 @@ O projeto demonstra a integração de:
 * **LLMs locais**
 * **RAG**
 * **automação de tarefas**
-* **MCP para ferramentas externas**
 
 Esse tipo de arquitetura permite construir sistemas de IA **mais confiáveis, auditáveis e baseados em evidências**.
 
